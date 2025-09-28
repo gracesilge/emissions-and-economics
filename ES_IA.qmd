@@ -1,0 +1,306 @@
+---
+title: "Carbon Emissions and Economic Success"
+subtitle: "How does the carbon emissions per capita of a country affect its GDP per capita and unemployment rate?"
+bibliography: enviro.bib
+nocite: |
+  @data_co2, @data_gdp, @data_unemployment
+format: 
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+    documentclass: "scrreprt"
+    papersize: letter
+    linestretch: 2
+    fig-cap-location: top
+editor: visual
+knitr: 
+  opts_chunk: 
+    echo: false
+    warning: false
+    message: false
+---
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(scales)
+library(patchwork)
+library(janitor)
+library(kableExtra)
+library(ggpmisc)
+
+theme_set(theme_light())
+
+gdp_raw <- read_csv("GDPperCapita.csv", skip = 4) %>%
+  select(! c("Country Code", "Indicator Name", "Indicator Code")) %>%
+  pivot_longer(!"Country Name", names_to = "year", values_to = "GDP per Capita (current US dollars)") %>%
+  clean_names() %>%
+  filter(country_name %in% c("Argentina", "United States", "Guatemala", "France", "Madagascar", "Greece")) %>%
+  mutate(year = as.integer(year))
+
+ emissions_raw = read_csv("CarbonEmissions.csv", skip = 4) %>%
+  select(! c("Country Code", "Indicator Name", "Indicator Code")) %>%
+  pivot_longer(!"Country Name", names_to = "year", values_to = "CO2 emissions (metric tons per capita)") %>%
+    clean_names() %>%
+  filter(country_name %in% c("Argentina", "United States", "Guatemala", "France", "Madagascar", "Greece")) %>%
+  mutate(year = as.integer(year))
+
+unemployment_raw = read_csv("Unemployment.csv", skip = 4) %>%
+  select(! c("Country Code", "Indicator Name", "Indicator Code")) %>%
+  pivot_longer(!"Country Name", names_to = "year", values_to = "Unemployment Rate") %>%
+    clean_names() %>%
+  filter(country_name %in% c("Argentina", "United States", "Guatemala", "France", "Madagascar", "Greece")) %>%
+  mutate(year = as.integer(year))
+```
+
+```{r}
+
+all_data = gdp_raw %>% full_join(emissions_raw,   
+                                       by = c("country_name", "year"),
+                                       copy = FALSE,
+                                       suffix = c(".g", ".e")) %>% full_join(unemployment_raw,   
+                                       by = c("country_name", "year"),
+                                       copy = FALSE,
+                                       suffix = c(".e", ".u")) %>%
+  filter(year>=1990 & year<2020)
+```
+
+# Identifying the Context
+
+When thermal energy reflects off the surface of the Earth, some of it is captured and stored by greenhouse gases instead of dissipating into space. These greenhouse gases then release some of their stored energy into the lower atmosphere. Excess greenhouse gases can lead to an increase in tropospheric temperature, a phenomenon known as climate change. Climate change has numerous detrimental effects, including altered precipitation patterns, rising sea levels, extreme drought, and more. If climate change increases, areas in which crops can grow and humans can live will shift, leading to disruptions in food production and millions of environmental refugees being forced to leave their homes. In addition, property will be damaged and lives will be lost in the extreme weather events that many believe are worsened by climate change [@miller_spoolman_2015].
+
+One of the most-discussed greenhouse gases is carbon dioxide (CO~2~). Humans release millions of tons of CO~2~ annually through transportation, electricity generation, manufacturing, and more. The fact that human carbon emissions are contributing to climate change, and that climate change needs to be slowed and eventually stopped is widely accepted [@miller_spoolman_2015]. However, many people believe that cutting carbon emissions will have detrimental effects on the economy. In a 2018 interview with the Associated Press, Donald Trump said "\[...\] I'm not willing to \[...\] sacrifice the economic well-being of our country for \[climate change\]." [@press_2018] Many other politicians and members of the general public also believe that lowering carbon emissions will harm the economy, and it's not an unreasonable assumption to make. Whether raising livestock, transporting lumber, or heating an office or home, the creation and transportation of goods, raw materials, and services will almost always create carbon emissions. It would seem to be logical that a country would need to have ever-increasing levels of carbon emissions to create and ship useful products, and increase their economic success.
+
+However, I want to analyze the actual relationship between carbon emissions and a country's economic success. It has already been found that some countries are decoupling their carbon emissions and GDP, meaning that while their carbon emissions decrease, their GDP increases [@nugent_barone_2021]. I want to answer the more specific question of "How does the carbon emissions per capita of a country affect its GDP per capita and unemployment rate?" I feel that these are better indicators of a country's actual quality of life and economic success than the overall GDP. More people, whether citizens or politicians, understanding the actual relationship between carbon emissions and economic success could be one less roadblock to enacting and enforcing regulations to decrease carbon emissions, slow climate change, and protect a safe and sustainable future for ourselves and future generations.
+
+# Planning
+
+I gathered this data from the [The World Bank's data bank](data.worldbank.org). I downloaded the CSV files for GDP per capita, unemployment rate, and CO~2~ emissions per capita on March 17, 2023. The unemployment rate dataset was last accessed by the World Bank on February 21, 2023, the CO~2~ dataset was last updated in 2020, and the GDP dataset's most recent recorded year was 2021.
+
+I chose to examine Argentina, France, Greece, Guatemala, Madagascar, and the United States because I felt these countries represented a wide range of different levels of development and different areas of the world. I chose to analyze CO~2~ emissions per capita because it is one of the most measurable contributions to climate change, and GDP per capita and unemployment rate because they are reasonable and widely used measures of a country's economic success. In addition, I believe GDP per capita and unemployment rate reflect a country's economic success and wellbeing more accurately than the total GDP. The first year recorded in the CO~2~ emissions dataset was 1990, so I trimmed the other two datasets to match.
+
+These datasets were compiled by the World Bank from various organizations. The unemployment rate dataset was originally from the International Labour Association, the CO~2~ emissions per capita dataset from Climate Watch, and the GDP per capita dataset from the OECD and the World Bank. The agencies from which this data was originally sourced all have a commitment to high-quality, publicly available data, and are well respected, which is why I chose to use their data. However, a large amount of this data was originally from national statistics divisions [@climate_watch; @methodologies_world_bank; @ilostat; @oecd]. While it was processed by the organizations before being published, some of this data may hold inaccuracies because of inconsistencies between countries. In addition, developing countries do not have the same capacity to collect and report data that more-developed countries do, which could lead to inaccurate data. The processing by these organizations will hopefully have removed most of the inaccuracies, but some may remain.
+
+This data was aggregated at the country level, and as such there is no personal data is being unethically released. All of this data is licensed under Creative Commons. The ["Unemployment, total (% of total labor force) (modeled ILO estimate)"](https://data.worldbank.org/indicator/SL.UEM.TOTL.ZS) dataset from the International Labour Organization and the ["GDP per capita (current US\$)"](https://data.worldbank.org/indicator/NY.GDP.PCAP.CD) dataset from World Bank and OECD national accounts data are both licensed under [CC BY-4.0](https://creativecommons.org/licenses/by/4.0/). The ["CO2 emissions (metric tons per capita)"](https://data.worldbank.org/indicator/EN.ATM.CO2E.PC?view=chart) dataset from Climate Watch is licensed under [Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/). These licenses allow me to copy, modify (which I have done by selecting only certain countries and years to analyze), and distribute all of this data for noncommercial uses, such as for this academic paper.
+
+# Results and Analysis
+
+```{r}
+#| fig-height: 6
+#| fig-width: 5
+#| fig-cap: "Unemployment rate, GDP per capita, and carbon dioxide emissions per capita over time"
+#| label: fig-time-variation
+
+unemployment = all_data %>%
+  ggplot(aes(x = year, y = unemployment_rate, color = country_name)) +
+  geom_line(alpha =.9) +
+  scale_x_continuous(limits = c(1990, 2020)) +
+  labs(color = NULL, x = "Year", y = "Unemployment Rate (%)")
+
+gdp = all_data %>%
+  ggplot(aes(x = year, y = gdp_per_capita_current_us_dollars, color = country_name)) +
+  geom_line(alpha =.9) +
+  scale_x_continuous(limits = c(1990, 2020)) +
+  labs(color = NULL, x = "Year", y = "GDP per Capita (Current US Dollars)")
+
+
+emissions = all_data %>%
+  ggplot(aes(x = year, y = co2_emissions_metric_tons_per_capita, color = country_name)) +
+  geom_line(alpha =.9) +
+  scale_x_continuous(limits = c(1990, 2020)) +
+  labs(color = NULL, x = "Year", y = "Carbon Dioxide Emissions per Capita (Metric Tons)")
+
+unemployment + gdp +emissions + guide_area() + plot_layout(guides = "collect")
+```
+
+In almost every country, GDP per capita is trending upward. Unemployment rate shows much less consistency, but in most countries it is trending down. CO~2~ emissions per capita are trending down or staying consistent in most countries. The unemployment rate and GDP per capita were both affected by the economic crisis of 2008, which reversed their respective trends.
+
+{{< pagebreak >}}
+
+```{r}
+#| fig-height: 8
+#| fig-width: 7
+#| fig-cap: "Carbon dioxide emissions per capita vs. GDP per capita by country"
+#| label: fig-gdp-indiv
+
+all_data %>%
+  ggplot(aes(x = co2_emissions_metric_tons_per_capita, y = gdp_per_capita_current_us_dollars)) +
+  geom_point(alpha =.8, aes(color = country_name)) +
+  stat_poly_line(se = FALSE, aes(color = country_name)) +
+  stat_poly_eq(mapping = use_label(c("eq", "R2")), color = "BLACK") +
+  labs(color = NULL, x = "Carbon Dioxide Emissions per Capita (Metric Tons)", y = "GDP per Capita (Current US Dollars)") + 
+  facet_wrap(vars(country_name), scales = "free", nrow = 3) +
+  theme(legend.position = "none")
+```
+
+The individual countries show wide variation in the relationship of CO~2~ emissions per capita and GDP per capita. Argentina and Guatemala show a fairly strong positive correlation, with R^2^ values well above 0.50. Madagascar also has a positive correlation, but with a much lower R^2^ value of 0.34. Greece also has a positive correlation, but has a R^2^ value of only 0.04. France and the United States however, have negative correlations with high R^2^ values.
+
+In the higher-GDP countries (the United States and France), as GDP per capita increases, CO~2~ emissions per capita decrease. In Greece, a historically high-GDP country affected particularly harshly by the 2008 economic recession [@bbc_news_2018], there is almost no relationship between GDP per capita and CO~2~ emissions per capita. In the less-developed countries, as CO~2~ emissions per capita increase, GDP per capita also increases. {{< pagebreak >}}
+
+```{r}
+#| fig-height: 6
+#| fig-width: 7
+#| fig-cap: "Carbon dioxide emissions per capita vs. GDP per capita overall"
+#| label: fig-gdp-all
+
+all_data %>%
+  ggplot(aes(x = co2_emissions_metric_tons_per_capita, y = gdp_per_capita_current_us_dollars)) +
+  geom_point(alpha =.9, aes(color = country_name), size = .9) +
+  stat_poly_line(se = FALSE, mapping = aes(color = country_name)) +
+  stat_poly_line(se = FALSE, color = "BLACK") +
+  stat_poly_eq(mapping = use_label(c("eq", "R2"))) +
+  labs(color = NULL, x = "Carbon Dioxide Emissions per Capita (Metric Tons)", y = "GDP per Capita (Current US Dollars)") + 
+  theme(legend.position = "bottom")
+```
+
+Within countries, the relationship between CO~2~ emissions per capita and GDP per capita can vary widely. However, between countries, the relationship is clear. As CO~2~ emissions per capita increase, so does GDP per capita. While individual countries have managed to decrease their CO~2~ emissions per capita while increasing their GDP per capita, overall, a country's CO~2~ emissions per capita predict their GDP per capita fairly accurately, with a R^2^ value of 0.59.
+
+```{r}
+#| fig-height: 8
+#| fig-width: 7
+#| fig-cap: "Carbon dioxide emissions per capita vs. unemployment rate by country"
+#| label: fig-unemployment-indiv
+
+all_data %>%
+  ggplot(aes(x = co2_emissions_metric_tons_per_capita, y = unemployment_rate)) +
+  geom_point(alpha =.8, aes(color = country_name)) +
+  stat_poly_line(se = FALSE, mapping = aes(color = country_name)) +
+  stat_poly_eq(mapping = use_label(c("eq", "r2")), color = "BLACK", label.x = "right") +
+  labs(color = NULL, x = "Carbon Dioxide Emissions per Capita (Metric Tons)", y = "Unemployment Rate (%)") + 
+  facet_wrap(vars(country_name), scales = "free", nrow = 3) +
+  theme(legend.position = "none")
+```
+
+In every country except for France, as CO~2~ emissions increase, unemployment decreases. However, the R^2^ values vary widely between countries. In Argentina, Madagascar, and Greece, CO~2~ emissions is a somewhat accurate predictor of unemployment, with an R^2^ value of at least .35, and in Greece, over .50. However, Guatemala and the United States both have R^2^ values of 0.02. France's positive correlation is also very weak, with an R^2^ value of 0.06. Unemployment rate is much less correlated with CO~2~ emissions than GDP per capita is. 4 of the 6 examined countries had R^2^ values of over .60 when investigating the relationship between CO~2~ emissions per capita and GDP per capita, while no country has an R^2^ value over .60 when investigating the relationship between CO~2~ emissions per capita and unemployment rate.
+
+{{< pagebreak >}}
+
+```{r}
+#| fig-height: 5
+#| fig-width: 6.5
+#| fig-cap: "Carbon dioxide emissions per capita vs. unemployment rate overall"
+#| label: fig-unemployment-all
+
+all_data %>%
+  ggplot(aes(x = co2_emissions_metric_tons_per_capita, y = unemployment_rate)) +
+  geom_point(alpha =.9, aes(color = country_name), size = .9) + 
+  stat_poly_line(se = FALSE, mapping = aes(color = country_name)) +
+  stat_poly_line(se = FALSE, color = "BLACK") +
+  stat_poly_eq(mapping = use_label(c("eq", "R2")), label.x = "right") +
+  labs(color = NULL, x = "Carbon Dioxide Emissions per Capita (Metric Tons)", y = "Unemployment Rate (%)") + 
+  theme(legend.position = "bottom")
+```
+
+Overall, CO~2~ emissions have next to no correlation with unemployment rate, with an R^2^ value of 0.01. We can see the lack of effect of CO~2~ emissions has even within countries represented, as Argentina's and Madagascar's unemployment rates varied wildly while their CO~2~ emissions per capita varied very little. In addition, we can see that at certain points France and Greece had nearly the same carbon emissions per capita, yet their respective unemployment rates differed by 10% or more. Different countries' CO~2~ emissions per capita do not accurately predict their respective unemployment rates.
+
+# Conclusion
+
+When CO~2~ emissions per capita increase, in lower-GDP countries, GDP per capita increases, while in higher-GDP countries, GDP per capita decreases. France and the United States have the two highest GDP per capita overall, and they are the only ones that have a negative correlation between GDP per capita and CO~2~ emissions per capita. Argentina, Guatemala, and Madagascar all have significantly lower GDP per capita, and all have a positive correlation between GDP per capita and CO~2~ emissions per capita. Greece's lowest GDP per capita has overlap with Argentina, while its highest GDP per capita has overlap with France. Greece was a high GDP country before the 2008 economic crisis, but its GDP fell steeply and has not yet recovered. It has next to no correlation between its carbon emissions per capita and GDP per capita. Greece marks both the boundary between a "high-GDP" and "low-GDP" country, and the boundary between a positive and negative correlation. This helps illustrate that the relative GDP of a country determines the relationship between its CO~2~ emissions per capita and its GDP per capita.
+
+As CO~2~ emissions per person go up, unemployment rate is minimally affected. When analyzing the relationship between unemployment rate and CO~2~ emissions per capita, France, Guatemala, and the United States all have R^2^ values of less than .10, and Greece's R^2^ value, the highest of all of the countries, is only 0.54. The R^2^ value for all data points is only 0.01. These relatively low R^2^ values across the board mean that CO~2~ emissions per capita is not an accurate predictor of unemployment rate and therefore does not significantly affect unemployment rate.
+
+# Discussion and Evaluation
+
+Higher-GDP countries, such as France and the United States, have the highest carbon emissions per capita, and are contributing the most to the harm that climate change is causing. These higher-GDP countries have the resources to decrease their carbon emissions per capita while increasing their GDP per capita and keeping their unemployment rate stable. These countries decreasing their carbon emissions per capita will help slow the speed of climate change and mitigate the harmful effects. These higher-GDP countries have a responsibility to decrease their carbon emissions, so that lower-GDP countries can continue to develop, and the human race does not come to significant harm. This analysis shows that these countries' politicians and citizens can no longer use the economy as a reason or an excuse to not decrease their carbon emissions. Decreasing carbon emissions per capita will not make GDP per capita decrease, will not affect the unemployment rate, and will provide protection from harm for all citizens and all ecosystems of the world.
+
+One strength of my investigation is the sheer amount of data used. I had approximately 30 years of data for 6 different countries and 3 different indicators. I was able to analyze around 500 observations, which helps reduce the impact of outliers on my conclusions. I was also able to analyze data from countries with different levels of development and different areas of the world. Had I analyzed only the United States or only Madagascar, I would have drawn wildly different conclusions than after analyzing 6 very different countries. In addition, I used well-known and reliable measurements, methods, and sources in this investigation. GDP per capita, linear regression, and the World Bank are all well-respected and known to be reliable.
+
+Some weakness includes the limited scope within my investigation. I analyzed only 6 of the dozens of countries in the world. The differences between Madagascar and the United States, as well as the extremes of Greece's economy, show that there is a wide variety of how CO~2~ emissions effect a country's economy. I could be missing key information about the relationship between carbon emissions and economic success because that information was not present within the six countries I chose. In addition, I did not analyze any countries from Asia, Continental Africa, or Oceania, whose economies may function very differently than the countries that I did analyze. I also have no data from before 1990, while humans have been increasing CO~2~ emissions for at least 150 years [@epa]. This analysis provides a very limited snapshot of the long and complex relationship between carbon emissions and economic success. It also does not account for loss of growth. Reducing carbon emissions may lead to a loss of growth [@grantham_research_2022], while not leading to a direct decrease in GDP. This analysis only discusses increase or decrease in GDP per capita, not increase or decrease in growth or loss of potential growth. Finally, this analysis does not show any causality. I have analyzed the relationship between CO~2~ emissions per capita, GDP per capita, and unemployment rate, but do not know why they have that relationship.
+
+One limitation of this analysis is confounding variables and outlying behavior, such as Greece's extreme response to the 2008 economic crisis. While all countries analyzed were affected by the crisis, Greece was affected very severely [@bbc_news_2018]. Similarly, Argentina experienced recessions in both 1995 and the beginning of the 21st century [@argentina]. The relationship between CO~2~ emissions and the economic success of a country is likely different in a recession, but I cannot control whether or not recessions occur. In addition, much of this data was originally collected from country's internal statistical agencies [@climate_watch; @methodologies_world_bank; @ilostat; @oecd], which could lead to inaccuracies, misreporting, and differences in data collection and reporting between countries.
+
+A simple solution to the limited scope of my investigation would be to analyze as many countries possible. This could make the report very long, but it could be possible to simply include all of the countries on a general graph, then select countries that exemplify certain behaviors to be analyzed in depth. A modification to solve the limited time range of the investigation could be to find new data sets that have data from a longer time period. This could possibly entail going directly to smaller organizations instead of a large organization like the World Bank, or even going to individual country's statistics divisions to find the most data available, which may lead to a loss of accuracy.
+
+One further area of research is trying to find causality within the CO~2~ emissions and economic success relationship by investigating which causes which, or if they are both caused by an outside variable. Another further area of study is examining whether specific policies or actions change the relationship between CO~2~ emissions and economic success. One could ask whether the United States' and France's GDP per capita increasing as their CO~2~ emissions per capita are decreasing because of specific policies and actions, and if there is a way to implement these policies or actions in other countries. The results for how CO~2~ emissions affects GDP per capita and how it affects unemployment rate were very different, so one could also study other measures of economic and/or environmental impact, and see if those relationships reflect the relationships studied here, or are entirely different. Finally, one could search for a point or range of GDP per capita in which the correlation between CO~2~ emissions per capita and GDP per capita changes from positive to negative.
+
+# Applications
+
+A possible solution to people's misconceptions about the relationship between CO~2~ emissions and economic success, and their resulting unwillingness to reduce CO~2~ emissions, is a science outreach campaign publicizing the results from this analysis or similar studies. Dispelling people's misconceptions about the economy and carbon emissions could inspire individuals and politicians to decrease their CO~2~ emissions and protect themselves, their fellow human beings, and natural ecosystems from the damage of climate change. This campaign would be targeted at higher-GDP countries, because they are the ones with the most CO~2~ emissions per capita and the most ability to reduce their CO~2~ emissions per capita without harming their economy. Increasing the knowledge and involvement of the general public is an effective way to bring about real change, and could be very effective in decreasing carbon emissions and slowing climate change.
+
+Some strengths of this solution include that it is easier to implement than many other possible solutions. In the "age of information," distributing this information would be relatively easy, and certainly much easier than trying to pass extensive policies. This solution can help pave the way to future solutions, such as large policies or treaties, by inspiring individual citizens to push for those policies and treaties. In addition, this solution is the most convincing to high-GDP and high-emissions countries, so will create maximal emissions reductions. Finally, this solution can be rolled out on a country-by-country basis, and does not necessarily require international cooperation.
+
+One weakness of this solution is that it requires communicating to laypeople effectively. Showing exhaustive, in-depth scientific proof is not convincing or interesting to many, but communicating in a way that most people understand could lead to loss of information. In addition, this solution would require funding and organization in order to create a cohesive message and disseminate the information. Finally, this solution would be less convincing in low GDP countries, and would likely not help reduce the emissions as countries continue to develop.
+
+Limitations of this solution include people's internal attitudes. Some people do not believe we should not reduce carbon emissions because of the economy because of a genuine lack of information. However, this information has already been published [@nugent_barone_2021]. Some people are willfully ignorant of the already available data saying that the economy and CO~2~ emissions are not necessarily linked. In addition, even if someone knows and believes this information, it doesn't necessarily mean that they will act on it. If someone know this information but continues to support policies and actions that increase CO~2~ emissions, then them learning the information does not further the goal of mitigating the harm of climate change. Finally, a science outreach campaign cannot feasibly reach every single ignorant person. No matter what we did or how we spread this message, there would still be people who are unaware of this information.
+
+Spreading awareness of the true relationship between CO~2~ emissions and economic success, especially in higher-GDP countries, will lead to new policies and actions that lead to a safer, more beautiful world for all people. Scientists, governments, and ordinary citizens all have a responsibility to educate themselves about the consequences of climate change, and take action to prevent it.
+
+# References
+
+::: {#refs}
+:::
+
+# Data {.appendix}
+
+```{r}
+#| label: tbl-argentina
+#| tbl-cap: "Argentina emissions, unemployment, and GDP over time"
+all_data %>%
+  filter(country_name == "Argentina") %>%
+  select(!country_name) %>%
+  kable(align = "cccc", col.names = c("Year", "GDP per Capita in Current US Dollars", "CO~2~ Emissions (Metric Tons per Capita)", "Unemployment Rate")) %>%
+  kable_styling(latex_options = c("striped", "repeat_header"), font_size = 6) 
+```
+
+```{r}
+#| label: tbl-france
+#| tbl-cap: "France emissions, unemployment, and GDP over time"
+all_data %>%
+  filter(country_name == "France") %>%
+  select(!country_name) %>%
+  kable(align = "cccc", col.names = c("Year", "GDP per Capita in Current US Dollars", "CO~2~ Emissions (Metric Tons per Capita)", "Unemployment Rate")) %>%
+  kable_styling(latex_options = c("striped", "repeat_header"), font_size = 6) 
+```
+
+```{r}
+#| label: tbl-greece
+#| tbl-cap: "Greece emissions, unemployment, and GDP over time"
+all_data %>%
+  filter(country_name == "Greece") %>%
+  select(!country_name) %>%
+  kable(align = "cccc", col.names = c("Year", "GDP per Capita in Current US Dollars", "CO~2~ Emissions (Metric Tons per Capita)", "Unemployment Rate")) %>%
+  kable_styling(latex_options = c("striped", "repeat_header"), font_size = 6) 
+```
+
+```{r}
+#| label: tbl-guatemala
+#| tbl-cap: "Guatemala emissions, unemployment, and GDP over time"
+all_data %>%
+  filter(country_name == "Guatemala") %>%
+  select(!country_name) %>%
+  kable(align = "cccc", col.names = c("Year", "GDP per Capita in Current US Dollars", "CO~2~ Emissions (Metric Tons per Capita)", "Unemployment Rate")) %>%
+  kable_styling(latex_options = c("striped", "repeat_header"), font_size = 6) 
+```
+
+```{r}
+#| label: tbl-madagascar
+#| tbl-cap: "Madagascar emissions, unemployment, and GDP over time"
+all_data %>%
+  filter(country_name == "Madagascar") %>%
+  select(!country_name) %>%
+  kable(align = "cccc", col.names = c("Year", "GDP per Capita in Current US Dollars", "CO~2~ Emissions (Metric Tons per Capita)", "Unemployment Rate")) %>%
+  kable_styling(latex_options = c("striped", "repeat_header"), font_size = 6) 
+```
+
+```{r}
+#| label: tbl-usa
+#| tbl-cap: "United States of America emissions, unemployment, and GDP over time"
+all_data %>%
+  filter(country_name == "United States") %>%
+  select(!country_name) %>%
+  kable(align = "cccc", col.names = c("Year", "GDP per Capita in Current US Dollars", "CO~2~ Emissions (Metric Tons per Capita)", "Unemployment Rate")) %>%
+  kable_styling(latex_options = c("striped", "repeat_header"), font_size = 6) 
+```
+
+{{< pagebreak >}}
+
+#### ***Proof of Work***
+
+![](proof1.png)
+
+![](proof2.png)
+
+![](proof3.png)
+
+![](proof4.png)
